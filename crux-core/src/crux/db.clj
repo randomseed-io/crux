@@ -54,6 +54,7 @@
 
 (defprotocol AttributeDictionary
   (attr->aid [this attr])
+  (aid->attr [this aid])
   (ensure-attr->aid [this attr]))
 
 (defrecord CloseableTxLogIterator [close-fn ^Iterator lazy-seq-iterator]
