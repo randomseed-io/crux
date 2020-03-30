@@ -439,7 +439,7 @@
              (into #{} (remove (fn [content-hash]
                                  (when-let [{eid ::db/id, :as doc} (get docs content-hash)]
                                    (or (idx/evicted-doc? doc)
-                                       (idx/doc-indexed? snapshot attr-dict eid content-hash))))))))))
+                                       (idx/doc-indexed? snapshot eid content-hash))))))))))
 
   (store-index-meta [_ k v]
     (idx/store-meta kv-store k v))

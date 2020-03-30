@@ -73,6 +73,9 @@
 ;; attribute dictionary
 (def ^:const ^:private attr->aid-index-id 9)
 
+;; indexed content-hashes
+(def ^:const ^:private indexed-content-hashes-index-id 10)
+
 (def ^:const ^:private value-type-id-size Byte/BYTES)
 
 (def ^:const id-size (+ hash/id-hash-size value-type-id-size))
@@ -787,3 +790,20 @@
 (defn decode-attr-dict-key-from [^DirectBuffer k]
   (assert (= attr->aid-index-id (.getByte k 0)))
   (keyword (.getStringUtf8 k index-id-size)))
+
+(defn encode-indexed-content-hash-to
+  (^org.agrona.DirectBuffer [^org.agrona.MutableDirectBuffer b, ^DirectBuffer eid]
+   (encode-indexed-content-hash-to b eid empty-buffer))
+  (^org.agrona.DirectBuffer [^org.agrona.MutableDirectBuffer b, ^DirectBuffer eid, ^DirectBuffer content-hash]
+   (let [^MutableDirectBuffer b (or b (mem/allocate-buffer (+ index-id-size id-size id-size)))]
+     (-> (doto b
+           (.putByte 0 indexed-content-hashes-index-id)
+           (.putBytes index-id-size eid 0 (.capacity eid))
+           (.putBytes (+ index-id-size id-size) content-hash 0 (.capacity content-hash)))
+         (mem/limit-buffer (+ index-id-size (.capacity eid) (.capacity content-hash)))))))
+
+(defn decode-indexed-content-hash-from [^DirectBuffer k]
+  (assert (= (+ index-id-size id-size id-size) (.capacity k)) (mem/buffer->hex k))
+  (assert (= indexed-content-hashes-index-id (.getByte k 0)))
+  {:eid (Id. (mem/slice-buffer k index-id-size id-size) 0)
+   :content-hash (Id. (mem/slice-buffer k (+ index-id-size id-size) id-size) 0)})

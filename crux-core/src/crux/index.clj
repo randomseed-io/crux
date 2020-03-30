@@ -391,14 +391,15 @@
 (defn doc-idx-keys [attr-dict content-hash doc]
   (let [id (c/->id-buffer (:crux.db/id doc))
         content-hash (c/->id-buffer content-hash)]
-    (->> (for [[k v] doc
-               :let [k (c/->aid-buffer (db/ensure-attr->aid attr-dict k))]
-               v (vectorize-value v)
-               :let [v (c/->value-buffer v)]
-               :when (pos? (mem/capacity v))]
-           [(c/encode-ave-key-to nil k v id)
-            (c/encode-aecv-key-to nil k id content-hash v)])
-         (apply concat))))
+    (into [(c/encode-indexed-content-hash-to nil id content-hash)]
+          (->> (for [[k v] doc
+                     :let [k (c/->aid-buffer (db/ensure-attr->aid attr-dict k))]
+                     v (vectorize-value v)
+                     :let [v (c/->value-buffer v)]
+                     :when (pos? (mem/capacity v))]
+                 [(c/encode-ave-key-to nil k v id)
+                  (c/encode-aecv-key-to nil k id content-hash v)])
+               (apply concat)))))
 
 (defn store-doc-idx-keys [kv idx-keys]
   (kv/store kv (for [k idx-keys]
@@ -409,11 +410,8 @@
 
 ;; Utils
 
-(defn doc-indexed? [snapshot attr-dict eid content-hash]
-  (let [k (c/->aid-buffer (db/attr->aid attr-dict :crux.db/id))
-        eid (c/->id-buffer eid)
-        content-hash (c/->id-buffer content-hash)]
-    (boolean (kv/get-value snapshot (c/encode-aecv-key-to nil k eid content-hash eid)))))
+(defn doc-indexed? [snapshot eid content-hash]
+  (boolean (kv/get-value snapshot (c/encode-indexed-content-hash-to nil (c/->id-buffer eid) (c/->id-buffer content-hash)))))
 
 (defn current-index-version [kv]
   (with-open [snapshot (kv/new-snapshot kv)]
