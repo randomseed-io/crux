@@ -139,7 +139,7 @@
 ;; AEV
 
 (defn- attribute-entity+placeholder [k aid entity-as-of-idx ^EntityValueEntityPeekState peek-state]
-  (let [eid (.eid (c/decode-aecv-key->evc-from k))
+  (let [eid (c/decode-ae-key->e-from k)
         eid-buffer (c/->id-buffer eid)
         [_ ^EntityTx entity-tx] (db/seek-values entity-as-of-idx eid-buffer)]
     (set! (.last-k peek-state) k)
@@ -152,7 +152,7 @@
   db/Index
   (seek-values [this eid]
     (when (c/valid-id? eid)
-      (when-let [eid (->> (c/encode-aecv-key-to
+      (when-let [eid (->> (c/encode-ae-key-to
                            (.get seek-buffer-tl)
                            aid
                            (or eid c/empty-buffer))
@@ -175,7 +175,7 @@
 
 (defn new-doc-attribute-entity-value-entity-index [snapshot aid entity-as-of-idx]
   (let [aid (c/->aid-buffer aid)
-        prefix (c/encode-aecv-key-to nil aid)]
+        prefix (c/encode-ae-key-to nil aid)]
     (->DocAttributeEntityValueEntityIndex (new-prefix-kv-iterator (kv/new-iterator snapshot) prefix) aid entity-as-of-idx
                                           (EntityValueEntityPeekState. nil nil))))
 
@@ -387,7 +387,7 @@
                      :let [v (c/->value-buffer v)]
                      :when (pos? (mem/capacity v))]
                  [(c/encode-ave-key-to nil k v id)
-                  (c/encode-aecv-key-to nil k id content-hash v)])
+                  (c/encode-ae-key-to nil k id)])
                (apply concat)))))
 
 (defn store-doc-idx-keys [kv idx-keys]
