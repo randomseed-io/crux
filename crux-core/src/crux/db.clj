@@ -3,6 +3,9 @@
            java.util.Iterator
            crux.api.ITxLog))
 
+(defprotocol ParentIndex
+  (prefix-iterator [this i]))
+
 ;; tag::Index[]
 (defprotocol Index
   (seek-values [this k])

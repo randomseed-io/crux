@@ -60,7 +60,9 @@
     (set! (.value peek-state) value)
     [value :crux.index.binary-placeholder/value]))
 
-(defrecord DocAttributeValueEntityValueIndex [i ^DirectBuffer aid ^ValueEntityValuePeekState peek-state]
+(defrecord ValueAndPrefixIterator [value prefix-iterator])
+
+(defrecord DocAttributeValueEntityValueIndex [i ^DirectBuffer aid ^ValueEntityValuePeekState peek-state prefix-eb]
   db/Index
   (seek-values [this k]
     (when-let [k (->> (c/encode-ave-key-to
@@ -77,12 +79,18 @@
                                   (mem/limit-buffer prefix-size)
                                   mem/inc-unsigned-buffer!)
                               (kv/seek i))]
-          (attribute-value+placeholder k peek-state))))))
+          (attribute-value+placeholder k peek-state)))))
+
+  db/ParentIndex
+  (prefix-iterator [this i]
+    (let [value (.value peek-state)
+          prefix (c/encode-ave-key-to prefix-eb aid value)]
+      (ValueAndPrefixIterator. value (new-prefix-kv-iterator i prefix)))))
 
 (defn new-doc-attribute-value-entity-value-index [snapshot aid]
   (let [aid (c/->aid-buffer aid)
         prefix (c/encode-ave-key-to nil aid)]
-    (->DocAttributeValueEntityValueIndex (new-prefix-kv-iterator (kv/new-iterator snapshot) prefix) aid (ValueEntityValuePeekState. nil nil))))
+    (->DocAttributeValueEntityValueIndex (new-prefix-kv-iterator (kv/new-iterator snapshot) prefix) aid (ValueEntityValuePeekState. nil nil) (ExpandableDirectByteBuffer.))))
 
 (declare vectorize-value)
 
@@ -102,18 +110,11 @@
         (when-let [k (some->> (.peek peek-state) (kv/seek i))]
           (recur k)))))
 
-(defrecord ValueAndPrefixIterator [value prefix-iterator])
-
-(defn- attribute-value-value+prefix-iterator ^crux.index.ValueAndPrefixIterator [i ^DocAttributeValueEntityValueIndex value-entity-value-idx aid prefix-eb]
-  (let [value (.value ^ValueEntityValuePeekState (.peek-state value-entity-value-idx))
-        prefix (c/encode-ave-key-to prefix-eb aid value)]
-    (ValueAndPrefixIterator. value (new-prefix-kv-iterator i prefix))))
-
 (defrecord DocAttributeValueEntityEntityIndex [snapshot i ^DirectBuffer aid value-entity-value-idx entity-as-of-idx object-store attr-dict prefix-eb peek-eb ^DocAttributeValueEntityEntityIndexState peek-state]
   db/Index
   (seek-values [this k]
     (when (c/valid-id? k)
-      (let [value+prefix-iterator (attribute-value-value+prefix-iterator i value-entity-value-idx aid prefix-eb)
+      (let [value+prefix-iterator ^ValueAndPrefixIterator (db/prefix-iterator value-entity-value-idx i)
             value (.value value+prefix-iterator)
             i (.prefix-iterator value+prefix-iterator)]
         (when-let [k (->> (c/encode-ave-key-to
@@ -125,7 +126,7 @@
           (attribute-value-entity-entity+value snapshot i k aid value entity-as-of-idx object-store attr-dict peek-eb peek-state)))))
 
   (next-values [this]
-    (let [value+prefix-iterator (attribute-value-value+prefix-iterator i value-entity-value-idx aid prefix-eb)
+    (let [value+prefix-iterator ^ValueAndPrefixIterator (db/prefix-iterator value-entity-value-idx i)
           value (.value value+prefix-iterator)
           i (.prefix-iterator value+prefix-iterator)]
       (when-let [k (some->> (.peek peek-state) (kv/seek i))]
