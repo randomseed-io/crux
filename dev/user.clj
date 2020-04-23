@@ -6,7 +6,6 @@
             [integrant.repl :as ir :refer [clear go suspend resume halt reset reset-all]]
             [crux.io :as cio]
             [crux.kafka.embedded :as ek]
-            [crux.calcite :as cal]
             [clojure.java.io :as io])
   (:import (crux.api ICruxAPI)
            (java.io Closeable)))
